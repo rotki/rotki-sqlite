@@ -16,36 +16,36 @@ env:
   CIBW_BUILD_FRONTEND: 'build[uv]'
 
 jobs:
-  build_wheels_macos:
-    name: Build macOS wheels (${{ matrix.arch }})
-    runs-on: macos-13
-    strategy:
-      matrix:
-        arch: [x86_64, arm64]
+  # build_wheels_macos:
+  #   name: Build macOS wheels (${{ matrix.arch }})
+  #   runs-on: macos-13
+  #   strategy:
+  #     matrix:
+  #       arch: [x86_64, arm64]
 
-    steps:
-      - uses: actions/checkout@v4
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install cibuildwheel
-        run: |
-          pip install cibuildwheel[uv]==${{ env.CIBW_VERSION }}
+  #     - name: Install cibuildwheel
+  #       run: |
+  #         pip install cibuildwheel[uv]==${{ env.CIBW_VERSION }}
 
-      - name: Build wheels
-        env:
-          CIBW_ARCHS_MACOS: ${{ matrix.arch }}
-        run: |
-          python -m cibuildwheel --output-dir dist
+  #     - name: Build wheels
+  #       env:
+  #         CIBW_ARCHS_MACOS: ${{ matrix.arch }}
+  #       run: |
+  #         python -m cibuildwheel --output-dir dist
 
-      - name: Upload macOS wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-macos-${{ matrix.arch }}-cp311
-          path: dist/*.whl
+  #     - name: Upload macOS wheels
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: wheel-macos-${{ matrix.arch }}-cp311
+  #         path: dist/*.whl
 
   build_wheels_linux:
     name: Build Linux wheels (${{ matrix.arch.name }})
@@ -82,31 +82,31 @@ jobs:
           name: wheel-linux-${{ matrix.arch.name }}-cp311
           path: dist/*.whl
 
-  build_wheels_windows:
-    name: Build Windows wheels
-    runs-on: windows-latest
+  # build_wheels_windows:
+  #   name: Build Windows wheels
+  #   runs-on: windows-latest
 
-    steps:
-      - uses: actions/checkout@v4
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install cibuildwheel
-        run: |
-          pip install cibuildwheel[uv]==${{ env.CIBW_VERSION }}
+  #     - name: Install cibuildwheel
+  #       run: |
+  #         pip install cibuildwheel[uv]==${{ env.CIBW_VERSION }}
 
-      - name: Build wheels
-        run: |
-          python -m cibuildwheel --output-dir dist
+  #     - name: Build wheels
+  #       run: |
+  #         python -m cibuildwheel --output-dir dist
 
-      - name: Upload Windows wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-windows-cp311
-          path: dist/*.whl
+  #     - name: Upload Windows wheel
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: wheel-windows-cp311
+  #         path: dist/*.whl
 
   build_sdist:
     name: Build source distribution
@@ -139,7 +139,8 @@ jobs:
 
   collect_artifacts:
     name: Collect all wheels and sdist
-    needs: [build_wheels_macos, build_wheels_linux, build_wheels_windows, build_sdist]
+    needs: [build_wheels_linux, build_sdist]
+    #needs: [build_wheels_macos, build_wheels_linux, build_wheels_windows, build_sdist]
     runs-on: ubuntu-latest
 
     steps:
@@ -170,7 +171,7 @@ jobs:
 
     environment:
       name: publish
-      url: https://test.pypi.org/p/rsqlite
+      url: https://test.pypi.org/p/rotki-sqlite
 
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
@@ -181,7 +182,7 @@ jobs:
         with:
           name: python-package-distributions
           path: dist/
-          
+
       - name: Publish distribution 📦 to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
