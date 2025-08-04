@@ -29,7 +29,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/rotki/rsqlite"
+Homepage = "https://github.com/rotki/rotki-sqlite"
 
 # Setuptools-specific configuration
 [tool.setuptools]

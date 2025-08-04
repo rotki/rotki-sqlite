@@ -2,10 +2,8 @@ name: Build Wheels
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+    tags:
+    - '*'
 
 env:
   PYTHON_VERSION: '3.11.9'
@@ -55,7 +53,7 @@ jobs:
         arch:
           - name: aarch64
             runner: ubuntu-24.04-arm
-          - name: native
+          - name: amd64
             runner: ubuntu-24.04
 
     steps:
@@ -164,13 +162,13 @@ jobs:
           path: dist/*
 
   publish-to-testpypi:
-    name: Publish Python 🐍 distribution 📦 to TestPyPI
+    name: Publish Python to Pypi
     needs: [collect_artifacts]
     runs-on: ubuntu-latest
 
     environment:
       name: publish
-      url: https://test.pypi.org/project/rotki-sqlite/
+      url: https://pypi.org/project/rotki-sqlite/
 
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
@@ -184,7 +182,3 @@ jobs:
 
       - name: Publish distribution 📦 to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          verbose: true
-          print-hash: true
