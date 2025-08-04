@@ -13,6 +13,7 @@ env:
   CIBW_BUILD: 'cp311-*'
   CIBW_SKIP: '*-musllinux_*'
   CIBW_BUILD_VERBOSITY: 1
+  CIBW_BUILD_FRONTEND: 'build[uv]'
 
 jobs:
   build_wheels_macos:
@@ -32,7 +33,7 @@ jobs:
 
       - name: Install cibuildwheel
         run: |
-          pip install cibuildwheel==${{ env.CIBW_VERSION }}
+          pip install cibuildwheel[uv]==${{ env.CIBW_VERSION }}
 
       - name: Build wheels
         env:
@@ -47,8 +48,15 @@ jobs:
           path: dist/*.whl
 
   build_wheels_linux:
-    name: Build Linux wheels
-    runs-on: ubuntu-22.04
+    name: Build Linux wheels (${{ matrix.arch.name }})
+    runs-on: ${{ matrix.arch.runner }}
+    strategy:
+      matrix:
+        arch:
+          - name: aarch64
+            runner: ubuntu-24.04-arm
+          - name: native
+            runner: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
@@ -60,16 +68,18 @@ jobs:
 
       - name: Install cibuildwheel
         run: |
-          pip install cibuildwheel==${{ env.CIBW_VERSION }}
+          pip install cibuildwheel[uv]==${{ env.CIBW_VERSION }}
 
       - name: Build wheels
+        env:
+          CIBW_ARCHS_LINUX: ${{ matrix.arch.name == 'aarch64' && 'aarch64' || 'auto' }}
         run: |
           python -m cibuildwheel --output-dir dist
 
       - name: Upload Linux wheel
         uses: actions/upload-artifact@v4
         with:
-          name: wheel-linux-cp311
+          name: wheel-linux-${{ matrix.arch.name }}-cp311
           path: dist/*.whl
 
   build_wheels_windows:
@@ -86,7 +96,7 @@ jobs:
 
       - name: Install cibuildwheel
         run: |
-          pip install cibuildwheel==${{ env.CIBW_VERSION }}
+          pip install cibuildwheel[uv]==${{ env.CIBW_VERSION }}
 
       - name: Build wheels
         run: |
@@ -98,9 +108,38 @@ jobs:
           name: wheel-windows-cp311
           path: dist/*.whl
 
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-20.04
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          persist-credentials: false
+          
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade build
+          
+      - name: Build sdist
+        run: |
+          python -m build -s
+          
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypi-sdist
+          path: dist/*.tar.gz
+
   collect_artifacts:
     name: Collect all wheels
-    needs: [build_wheels_macos, build_wheels_linux, build_wheels_windows]
+    needs: [build_wheels_macos, build_wheels_linux, build_wheels_windows, build_sdist]
     runs-on: ubuntu-latest
 
     steps:
