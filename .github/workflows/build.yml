@@ -55,8 +55,8 @@ jobs:
         arch:
           - name: aarch64
             runner: ubuntu-24.04-arm
-          # - name: native
-          #   runner: ubuntu-24.04
+          - name: native
+            runner: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4
