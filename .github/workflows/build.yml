@@ -8,102 +8,101 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_wheels_macos:
-    name: Build macOS wheels (${{ matrix.arch }})
-    runs-on: macos-13
-    strategy:
-      matrix:
-        arch: [x86_64, arm64]
-        python-version: ['3.11']
-    
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
-
-      - name: Build ${{ matrix.arch }} wheel
-        env:
-          ARCHFLAGS: "-arch ${{ matrix.arch }}"
-          _PYTHON_HOST_PLATFORM: ${{ matrix.arch == 'arm64' && 'macosx-11.0-arm64' || 'macosx-10.9-x86_64' }}
-        run: |
-          uv build --wheel
-
-      - name: Upload ${{ matrix.arch }} wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-macos-${{ matrix.arch }}-py${{ matrix.python-version }}
-          path: dist/*.whl
-
-  build_wheels_macos_universal2:
-    name: Build macOS universal2 wheel
-    needs: build_wheels_macos
-    runs-on: macos-13
-    
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install tools
-        run: |
-          python -m pip install delocate wheel
-
-      - name: Download x86_64 wheel
-        uses: actions/download-artifact@v4
-        with:
-          name: wheel-macos-x86_64-py3.11
-          path: dist-x86_64
-
-      - name: Download arm64 wheel
-        uses: actions/download-artifact@v4
-        with:
-          name: wheel-macos-arm64-py3.11
-          path: dist-arm64
-
-      - name: Create universal2 wheel
-        run: |
-          # Extract wheels
-          cd dist-x86_64 && unzip -q *.whl && cd ..
-          cd dist-arm64 && unzip -q *.whl && cd ..
-          
-          # Find the .so file
-          SO_FILE=$(find dist-x86_64 -name "*.so" | head -1 | xargs basename)
-          SO_DIR=$(find dist-x86_64 -name "*.so" | head -1 | xargs dirname | xargs basename)
-          
-          # Create universal binary
-          lipo -create -output "$SO_DIR/$SO_FILE" \
-               "dist-x86_64/$SO_DIR/$SO_FILE" \
-               "dist-arm64/$SO_DIR/$SO_FILE"
-          
-          # Get wheel name for universal2
-          WHEEL_NAME=$(ls dist-x86_64/*.whl | head -1 | xargs basename | sed 's/x86_64/universal2/g')
-          
-          # Copy x86_64 structure (metadata is the same)
-          cp -r dist-x86_64/rsqlite* .
-          cp -r dist-x86_64/*.dist-info .
-          
-          # Create new wheel with universal binary
-          python -m wheel pack . --dest-dir dist --build-number ""
-          
-          # Rename to universal2
-          mv dist/*.whl "dist/${WHEEL_NAME}"
-
-      - name: Upload universal2 wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-macos-universal2-py3.11
-          path: dist/*.whl
+  # Temporarily disabled for testing - uncomment when Linux build works
+  # build_wheels_macos:
+  #   name: Build macOS wheels (${{ matrix.arch }})
+  #   runs-on: macos-13
+  #   strategy:
+  #     matrix:
+  #       arch: [x86_64, arm64]
+  #       python-version: ['3.11']
+  #   
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - name: Set up Python ${{ matrix.python-version }}
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: ${{ matrix.python-version }}
+  #
+  #     - name: Install uv
+  #       uses: astral-sh/setup-uv@v3
+  #
+  #     - name: Build ${{ matrix.arch }} wheel
+  #       env:
+  #         ARCHFLAGS: "-arch ${{ matrix.arch }}"
+  #         _PYTHON_HOST_PLATFORM: ${{ matrix.arch == 'arm64' && 'macosx-11.0-arm64' || 'macosx-10.9-x86_64' }}
+  #       run: |
+  #         uv build --wheel
+  #
+  #     - name: Upload ${{ matrix.arch }} wheel
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: wheel-macos-${{ matrix.arch }}-py${{ matrix.python-version }}
+  #         path: dist/*.whl
+  #
+  # build_wheels_macos_universal2:
+  #   name: Build macOS universal2 wheel
+  #   needs: build_wheels_macos
+  #   runs-on: macos-13
+  #   
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - name: Set up Python 3.11
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.11'
+  #
+  #     - name: Install tools
+  #       run: |
+  #         python -m pip install delocate wheel
+  #
+  #     - name: Download x86_64 wheel
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: wheel-macos-x86_64-py3.11
+  #         path: dist-x86_64
+  #
+  #     - name: Download arm64 wheel
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: wheel-macos-arm64-py3.11
+  #         path: dist-arm64
+  #
+  #     - name: Create universal2 wheel
+  #       run: |
+  #         # Extract wheels
+  #         cd dist-x86_64 && unzip -q *.whl && cd ..
+  #         cd dist-arm64 && unzip -q *.whl && cd ..
+  #         
+  #         # Find the .so file
+  #         SO_FILE=$(find dist-x86_64 -name "*.so" | head -1 | xargs basename)
+  #         SO_DIR=$(find dist-x86_64 -name "*.so" | head -1 | xargs dirname | xargs basename)
+  #         
+  #         # Create universal binary
+  #         lipo -create -output "$SO_DIR/$SO_FILE" \
+  #              "dist-x86_64/$SO_DIR/$SO_FILE" \
+  #              "dist-arm64/$SO_DIR/$SO_FILE"
+  #         
+  #         # Get wheel name for universal2
+  #         WHEEL_NAME=$(ls dist-x86_64/*.whl | head -1 | xargs basename | sed 's/x86_64/universal2/g')
+  #         
+  #         # Copy x86_64 structure (metadata is the same)
+  #         cp -r dist-x86_64/rsqlite* .
+  #         cp -r dist-x86_64/*.dist-info .
+  #         
+  #         # Create new wheel with universal binary
+  #         python -m wheel pack . --dest-dir dist --build-number ""
+  #         
+  #         # Rename to universal2
+  #         mv dist/*.whl "dist/${WHEEL_NAME}"
+  #
+  #     - name: Upload universal2 wheel
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: wheel-macos-universal2-py3.11
+  #         path: dist/*.whl
 
   build_wheels_linux:
     name: Build Linux wheels
@@ -119,8 +118,6 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
 
       - name: Build wheel
         run: |
@@ -132,36 +129,36 @@ jobs:
           name: wheel-linux-py3.11
           path: dist/*.whl
 
-  build_wheels_windows:
-    name: Build Windows wheels
-    runs-on: windows-latest
-    
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-        with:
-          enable-cache: true
-
-      - name: Build wheel
-        run: |
-          uv build --wheel
-
-      - name: Upload Windows wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-windows-py3.11
-          path: dist/*.whl
+  # Temporarily disabled for testing - uncomment when Linux build works
+  # build_wheels_windows:
+  #   name: Build Windows wheels
+  #   runs-on: windows-latest
+  #   
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - name: Set up Python 3.11
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.11'
+  #
+  #     - name: Install uv
+  #       uses: astral-sh/setup-uv@v3
+  #
+  #     - name: Build wheel
+  #       run: |
+  #         uv build --wheel
+  #
+  #     - name: Upload Windows wheel
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: wheel-windows-py3.11
+  #         path: dist/*.whl
 
   collect_artifacts:
     name: Collect all wheels
-    needs: [build_wheels_macos_universal2, build_wheels_linux, build_wheels_windows]
+    needs: [build_wheels_linux]  # Temporarily only Linux for testing
+    # needs: [build_wheels_macos_universal2, build_wheels_linux, build_wheels_windows]
     runs-on: ubuntu-latest
     
     steps:
