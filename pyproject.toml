@@ -1,11 +1,10 @@
-# pyproject.toml
-
 [build-system]
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "rotki-sqlite"
+requires-python = "==3.11.*"
 version = "2025.07.04"
 description = "DB-API 2.0 interface for Sqlite 3.x"
 # Assumes you have a README.md file for the long description.
@@ -13,7 +12,7 @@ description = "DB-API 2.0 interface for Sqlite 3.x"
 readme = "README.md"
 license = { text = "zlib/libpng" }
 authors = [
-    { name = "Charles Leifer", email = "coleifer@gmail.com" },
+    {name = "Rotki Solutions GmbH", email = "info@rotki.com"},
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
