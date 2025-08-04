@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rotki-sqlite"
-version = "0.0.1"
+version = "2025.07.04"
 description = "DB-API 2.0 interface for Sqlite 3.x"
 # Assumes you have a README.md file for the long description.
 # If not, you can remove this line or create the file.
