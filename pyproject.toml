@@ -5,8 +5,8 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rsqlite"
-version = "0.0.1"
+name = "rotki-sqlite"
+version = "2025.07.04"
 description = "DB-API 2.0 interface for Sqlite 3.x"
 # Assumes you have a README.md file for the long description.
 # If not, you can remove this line or create the file.
@@ -29,7 +29,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/rotki/rsqlite"
+Homepage = "https://github.com/rotki/rotki-sqlite"
 
 # Setuptools-specific configuration
 [tool.setuptools]
