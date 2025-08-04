@@ -7,109 +7,69 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  PYTHON_VERSION: '3.11.13'
+  CIBW_VERSION: '2.21.3'
+  CIBW_BUILD: 'cp311-*'
+  CIBW_SKIP: '*-musllinux_*'
+  CIBW_BUILD_VERBOSITY: 1
+
 jobs:
   build_wheels_macos:
-    name: Build macOS wheels (all architectures)
+    name: Build macOS wheels (${{ matrix.arch }})
     runs-on: macos-13
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install uv and tools
+      - name: Install cibuildwheel
         run: |
-          pip install --upgrade pip
-          pip install delocate wheel
-        
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
+          pip install cibuildwheel==${{ env.CIBW_VERSION }}
 
-      - name: Build x86_64 wheel
+      - name: Build wheels
         env:
-          ARCHFLAGS: "-arch x86_64"
-          _PYTHON_HOST_PLATFORM: "macosx-10.9-x86_64"
+          CIBW_ARCHS_MACOS: ${{ matrix.arch }}
         run: |
-          uv build --wheel
-          mkdir -p dist-x86_64
-          mv dist/*.whl dist-x86_64/
-
-      - name: Build arm64 wheel
-        env:
-          ARCHFLAGS: "-arch arm64"
-          _PYTHON_HOST_PLATFORM: "macosx-11.0-arm64"
-        run: |
-          rm -rf dist/*
-          uv build --wheel
-          mkdir -p dist-arm64
-          mv dist/*.whl dist-arm64/
-
-      - name: Create universal2 wheel
-        run: |
-          # Extract wheels
-          cd dist-x86_64 && unzip -q *.whl && cd ..
-          cd dist-arm64 && unzip -q *.whl && cd ..
-
-          # Find the .so file
-          SO_FILE=$(find dist-x86_64 -name "*.so" | head -1 | xargs basename)
-          SO_DIR=$(find dist-x86_64 -name "*.so" | head -1 | xargs dirname | xargs basename)
-
-          # Create universal binary
-          lipo -create -output "$SO_DIR/$SO_FILE" \
-               "dist-x86_64/$SO_DIR/$SO_FILE" \
-               "dist-arm64/$SO_DIR/$SO_FILE"
-
-          # Get wheel name for universal2
-          WHEEL_NAME=$(ls dist-x86_64/*.whl | head -1 | xargs basename | sed 's/x86_64/universal2/g')
-
-          # Copy x86_64 structure (metadata is the same)
-          cp -r dist-x86_64/rsqlite* .
-          cp -r dist-x86_64/*.dist-info .
-
-          # Create new wheel with universal binary
-          mkdir -p dist
-          python -m wheel pack . --dest-dir dist
-
-          # Rename to universal2
-          FINAL_NAME=$(echo $WHEEL_NAME | sed 's/10_9/10_9/g' | sed 's/11_0/10_9/g')
-          mv dist/*.whl "dist/${FINAL_NAME}"
-          
-          # Also keep the individual architecture wheels
-          cp dist-x86_64/*.whl dist/
-          cp dist-arm64/*.whl dist/
+          python -m cibuildwheel --output-dir dist
 
       - name: Upload macOS wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheel-macos-py3.11
+          name: wheel-macos-${{ matrix.arch }}-cp311
           path: dist/*.whl
 
   build_wheels_linux:
     name: Build Linux wheels
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-
-      - name: Build wheel
+      - name: Install cibuildwheel
         run: |
-          uv build --wheel
+          pip install cibuildwheel==${{ env.CIBW_VERSION }}
+
+      - name: Build wheels
+        run: |
+          python -m cibuildwheel --output-dir dist
 
       - name: Upload Linux wheel
         uses: actions/upload-artifact@v4
         with:
-          name: wheel-linux-py3.11
+          name: wheel-linux-cp311
           path: dist/*.whl
 
   build_wheels_windows:
@@ -119,22 +79,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-
-      - name: Build wheel
+      - name: Install cibuildwheel
         run: |
-          uv build --wheel
+          pip install cibuildwheel==${{ env.CIBW_VERSION }}
+
+      - name: Build wheels
+        run: |
+          python -m cibuildwheel --output-dir dist
 
       - name: Upload Windows wheel
         uses: actions/upload-artifact@v4
         with:
-          name: wheel-windows-py3.11
+          name: wheel-windows-cp311
           path: dist/*.whl
 
   collect_artifacts:
