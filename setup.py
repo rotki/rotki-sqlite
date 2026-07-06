@@ -1,4 +1,9 @@
-from setuptools import setup, Extension
+import sysconfig
+
+from setuptools import Extension, setup
+
+
+python_internal_headers = f"{sysconfig.get_path('include')}/internal"
 
 sqlite_ext = Extension(
     "rsqlite._sqlite3",
@@ -14,9 +19,10 @@ sqlite_ext = Extension(
         "_sqlite/util.c",
         "sqlite3.c"
     ],
-    include_dirs=["."],
+    include_dirs=[".", python_internal_headers],
     define_macros=[
         ("MODULE_NAME", '"rsqlite"'),
+        ("Py_BUILD_CORE", "1"),
         ("PY_SQLITE_ENABLE_LOAD_EXTENSION", "1"),
         ("SQLITE_ENABLE_FTS5", "1"),
         ("SQLITE_ENABLE_JSON1", "1"),

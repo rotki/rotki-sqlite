@@ -2,16 +2,17 @@ name: Build Wheels
 
 on:
   pull_request:
-    banches:
+    branches:
       - main
   push:
     tags:
     - '*'
 
 env:
-  PYTHON_VERSION: '3.11.9'
+  PYTHON_VERSION: '3.13.5'
   CIBW_VERSION: '2.21.3'
-  CIBW_BUILD: 'cp311-*'
+  CIBW_BUILD: 'cp313-* cp313t-*'
+  CIBW_FREE_THREADED_SUPPORT: '1'
   CIBW_SKIP: '*-musllinux_*'
   CIBW_BUILD_VERBOSITY: 1
   CIBW_BUILD_FRONTEND: 'build[uv]'
@@ -81,7 +82,7 @@ jobs:
       - name: Upload macOS wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheel-macos-${{ matrix.arch }}-cp311
+          name: wheel-macos-${{ matrix.arch }}-cp313-cp313t
           path: dist/*.whl
 
   build_wheels_linux:
@@ -123,7 +124,7 @@ jobs:
       - name: Upload Linux wheel
         uses: actions/upload-artifact@v4
         with:
-          name: wheel-linux-${{ matrix.arch.name }}-cp311
+          name: wheel-linux-${{ matrix.arch.name }}-cp313-cp313t
           path: dist/*.whl
 
   build_wheels_windows:
@@ -156,7 +157,7 @@ jobs:
       - name: Upload Windows wheel
         uses: actions/upload-artifact@v4
         with:
-          name: wheel-windows-cp311
+          name: wheel-windows-cp313-cp313t
           path: dist/*.whl
 
   build_sdist:

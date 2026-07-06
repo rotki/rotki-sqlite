@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rotki-sqlite"
-requires-python = "==3.11.*"
+requires-python = "==3.13.*"
 version = "2025.08.01"
 description = "DB-API 2.0 interface for Sqlite 3.x"
 readme = "README.md"
@@ -21,6 +21,7 @@ classifiers = [
     "Operating System :: POSIX",
     "Programming Language :: C",
     "Programming Language :: Python",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Database :: Database Engines/Servers",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
