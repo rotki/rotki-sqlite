@@ -8,6 +8,12 @@ on:
     tags:
     - '*'
 
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PYTHON_VERSION: '3.13.5'
   CIBW_VERSION: '2.21.3'
@@ -28,7 +34,7 @@ jobs:
         run: |
           git clone https://github.com/sqlite/sqlite.git sqlite-src
           cd sqlite-src
-          git checkout version-${{ env.SQLITE_VERSION }}
+          git checkout "version-${SQLITE_VERSION}"
 
       - name: Build SQLite amalgamation
         run: |
@@ -39,7 +45,7 @@ jobs:
           make sqlite3.c
 
       - name: Upload SQLite amalgamation files
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: sqlite-amalgamation
           path: |
@@ -56,22 +62,24 @@ jobs:
         arch: [x86_64, arm64]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Download SQLite amalgamation
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           name: sqlite-amalgamation
           path: .
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install cibuildwheel
         run: |
-          pip install cibuildwheel[uv]==${{ env.CIBW_VERSION }}
+          python -m pip install "cibuildwheel[uv]==${CIBW_VERSION}"
 
       - name: Build wheels
         env:
@@ -80,7 +88,7 @@ jobs:
           python -m cibuildwheel --output-dir dist
 
       - name: Upload macOS wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: wheel-macos-${{ matrix.arch }}-cp313-cp313t
           path: dist/*.whl
@@ -98,22 +106,24 @@ jobs:
             runner: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Download SQLite amalgamation
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           name: sqlite-amalgamation
           path: .
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install cibuildwheel
         run: |
-          pip install cibuildwheel[uv]==${{ env.CIBW_VERSION }}
+          python -m pip install "cibuildwheel[uv]==${CIBW_VERSION}"
 
       - name: Build wheels
         env:
@@ -122,7 +132,7 @@ jobs:
           python -m cibuildwheel --output-dir dist
 
       - name: Upload Linux wheel
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: wheel-linux-${{ matrix.arch.name }}-cp313-cp313t
           path: dist/*.whl
@@ -133,29 +143,31 @@ jobs:
     needs: build_sqlite_amalgamation
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Download SQLite amalgamation
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           name: sqlite-amalgamation
           path: .
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install cibuildwheel
         run: |
-          pip install cibuildwheel[uv]==${{ env.CIBW_VERSION }}
+          python -m pip install "cibuildwheel[uv]==$env:CIBW_VERSION"
 
       - name: Build wheels
         run: |
           python -m cibuildwheel --output-dir dist
 
       - name: Upload Windows wheel
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: wheel-windows-cp313-cp313t
           path: dist/*.whl
@@ -166,19 +178,19 @@ jobs:
     needs: build_sqlite_amalgamation
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           submodules: true
           persist-credentials: false
 
       - name: Download SQLite amalgamation
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           name: sqlite-amalgamation
           path: .
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -191,7 +203,7 @@ jobs:
           python -m build -s
 
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: pypi-sdist
           path: dist/*.tar.gz
@@ -203,7 +215,7 @@ jobs:
 
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           path: all-artifacts
           pattern: '*'
@@ -217,7 +229,7 @@ jobs:
           ls -la dist/
 
       - name: Upload combined distributions
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: python-package-distributions
           path: dist/*
@@ -237,10 +249,10 @@ jobs:
 
     steps:
       - name: Download all the dists
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
         with:
           name: python-package-distributions
           path: dist/
 
       - name: Publish distribution 📦 to TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b  # release/v1
