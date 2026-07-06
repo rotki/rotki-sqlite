@@ -142,9 +142,8 @@ class _sqlite3.Connection "pysqlite_Connection *" "clinic_state()->ConnectionTyp
 [clinic start generated code]*/
 /*[clinic end generated code: output=da39a3ee5e6b4b0d input=67369db2faf80891]*/
 
-static int _pysqlite_drop_unused_cursor_references(pysqlite_Connection* self);
-static void incref_callback_context(callback_context *ctx);
-static void decref_callback_context(callback_context *ctx);
+static void _pysqlite_drop_unused_cursor_references(pysqlite_Connection* self);
+static void free_callback_context(callback_context *ctx);
 static void set_callback_context(callback_context **ctx_pp,
                                  callback_context *ctx);
 static int connection_close(pysqlite_Connection *self);
@@ -557,10 +556,7 @@ pysqlite_connection_cursor_impl(pysqlite_Connection *self, PyObject *factory)
         return NULL;
     }
 
-    if (_pysqlite_drop_unused_cursor_references(self) < 0) {
-        Py_DECREF(cursor);
-        return NULL;
-    }
+    _pysqlite_drop_unused_cursor_references(self);
 
     if (cursor && self->row_factory != Py_None) {
         Py_INCREF(self->row_factory);
@@ -570,47 +566,6 @@ pysqlite_connection_cursor_impl(pysqlite_Connection *self, PyObject *factory)
     return cursor;
 }
 
-static PyObject *
-connection_get_row_factory(PyObject *op, void *closure)
-{
-    pysqlite_Connection *self = (pysqlite_Connection *)op;
-    return Py_NewRef(self->row_factory);
-}
-
-static int
-connection_set_row_factory(PyObject *op, PyObject *value, void *closure)
-{
-    pysqlite_Connection *self = (pysqlite_Connection *)op;
-    if (value == NULL) {
-        PyErr_SetString(PyExc_AttributeError,
-                        "cannot delete row_factory attribute");
-        return -1;
-    }
-    Py_XSETREF(self->row_factory, Py_NewRef(value));
-    return 0;
-}
-
-static PyObject *
-connection_get_text_factory(PyObject *op, void *closure)
-{
-    pysqlite_Connection *self = (pysqlite_Connection *)op;
-    return Py_NewRef(self->text_factory);
-}
-
-static int
-connection_set_text_factory(PyObject *op, PyObject *value, void *closure)
-{
-    pysqlite_Connection *self = (pysqlite_Connection *)op;
-    if (value == NULL) {
-        PyErr_SetString(PyExc_AttributeError,
-                        "cannot delete text_factory attribute");
-        return -1;
-    }
-    Py_XSETREF(self->text_factory, Py_NewRef(value));
-    return 0;
-}
-
-
 /*[clinic input]
 _sqlite3.Connection.blobopen as blobopen
 
@@ -618,8 +573,8 @@ _sqlite3.Connection.blobopen as blobopen
         Table name.
     column as col: str
         Column name.
-    rowid as row: sqlite3_int64
-        Row id.
+    row: sqlite3_int64
+        Row index.
     /
     *
     readonly: bool = False
@@ -633,7 +588,7 @@ Open and return a BLOB object.
 static PyObject *
 blobopen_impl(pysqlite_Connection *self, const char *table, const char *col,
               sqlite3_int64 row, int readonly, const char *name)
-/*[clinic end generated code: output=6a02d43efb885d1c input=cc3d4b47dac08401]*/
+/*[clinic end generated code: output=6a02d43efb885d1c input=23576bd1108d8774]*/
 {
     if (!pysqlite_check_thread(self) || !pysqlite_check_connection(self)) {
         return NULL;
@@ -972,9 +927,8 @@ func_callback(sqlite3_context *context, int argc, sqlite3_value **argv)
     args = _pysqlite_build_py_params(context, argc, argv);
     if (args) {
         callback_context *ctx = (callback_context *)sqlite3_user_data(context);
-        incref_callback_context(ctx);
+        assert(ctx != NULL);
         py_retval = PyObject_CallObject(ctx->callable, args);
-        decref_callback_context(ctx);
         Py_DECREF(args);
     }
 
@@ -1001,7 +955,7 @@ step_callback(sqlite3_context *context, int argc, sqlite3_value **params)
     PyObject* stepmethod = NULL;
 
     callback_context *ctx = (callback_context *)sqlite3_user_data(context);
-    incref_callback_context(ctx);
+    assert(ctx != NULL);
 
     aggregate_instance = (PyObject**)sqlite3_aggregate_context(context, sizeof(PyObject*));
     if (aggregate_instance == NULL) {
@@ -1039,7 +993,6 @@ step_callback(sqlite3_context *context, int argc, sqlite3_value **params)
     }
 
 error:
-    decref_callback_context(ctx);
     Py_XDECREF(stepmethod);
     Py_XDECREF(function_result);
 
@@ -1071,10 +1024,9 @@ final_callback(sqlite3_context *context)
     PyObject *exc = PyErr_GetRaisedException();
 
     callback_context *ctx = (callback_context *)sqlite3_user_data(context);
-    incref_callback_context(ctx);
+    assert(ctx != NULL);
     function_result = PyObject_CallMethodNoArgs(*aggregate_instance,
                                                 ctx->state->str_finalize);
-    decref_callback_context(ctx);
     Py_DECREF(*aggregate_instance);
 
     ok = 0;
@@ -1102,36 +1054,32 @@ error:
     PyGILState_Release(threadstate);
 }
 
-static int
-_pysqlite_drop_unused_cursor_references(pysqlite_Connection* self)
+static void _pysqlite_drop_unused_cursor_references(pysqlite_Connection* self)
 {
     /* we only need to do this once in a while */
     if (self->created_cursors++ < 200) {
-        return 0;
+        return;
     }
 
     self->created_cursors = 0;
 
     PyObject* new_list = PyList_New(0);
     if (!new_list) {
-        return -1;
+        return;
     }
 
-    assert(PyList_CheckExact(self->cursors));
-    Py_ssize_t imax = PyList_GET_SIZE(self->cursors);
-    for (Py_ssize_t i = 0; i < imax; i++) {
-        PyObject* weakref = PyList_GET_ITEM(self->cursors, i);
+    for (Py_ssize_t i = 0; i < PyList_Size(self->cursors); i++) {
+        PyObject* weakref = PyList_GetItem(self->cursors, i);
         if (_PyWeakref_IsDead(weakref)) {
             continue;
         }
         if (PyList_Append(new_list, weakref) != 0) {
             Py_DECREF(new_list);
-            return -1;
+            return;
         }
     }
 
     Py_SETREF(self->cursors, new_list);
-    return 0;
 }
 
 /* Allocate a UDF/callback context structure. In order to ensure that the state
@@ -1144,16 +1092,12 @@ static callback_context *
 create_callback_context(PyTypeObject *cls, PyObject *callable)
 {
     callback_context *ctx = PyMem_Malloc(sizeof(callback_context));
-    if (ctx == NULL) {
-        PyErr_NoMemory();
-        return NULL;
+    if (ctx != NULL) {
+        PyObject *module = PyType_GetModule(cls);
+        ctx->callable = Py_NewRef(callable);
+        ctx->module = Py_NewRef(module);
+        ctx->state = pysqlite_get_state(module);
     }
-
-    PyObject *module = PyType_GetModule(cls);
-    ctx->refcount = 1;
-    ctx->callable = Py_NewRef(callable);
-    ctx->module = Py_NewRef(module);
-    ctx->state = pysqlite_get_state(module);
     return ctx;
 }
 
@@ -1161,31 +1105,9 @@ static void
 free_callback_context(callback_context *ctx)
 {
     assert(ctx != NULL);
-    assert(ctx->refcount == 0);
     Py_XDECREF(ctx->callable);
     Py_XDECREF(ctx->module);
     PyMem_Free(ctx);
-}
-
-static inline void
-incref_callback_context(callback_context *ctx)
-{
-    assert(PyGILState_Check());
-    assert(ctx != NULL);
-    assert(ctx->refcount > 0);
-    ctx->refcount++;
-}
-
-static inline void
-decref_callback_context(callback_context *ctx)
-{
-    assert(PyGILState_Check());
-    assert(ctx != NULL);
-    assert(ctx->refcount > 0);
-    ctx->refcount--;
-    if (ctx->refcount == 0) {
-        free_callback_context(ctx);
-    }
 }
 
 static void
@@ -1195,7 +1117,7 @@ set_callback_context(callback_context **ctx_pp, callback_context *ctx)
     callback_context *tmp = *ctx_pp;
     *ctx_pp = ctx;
     if (tmp != NULL) {
-        decref_callback_context(tmp);
+        free_callback_context(tmp);
     }
 }
 
@@ -1206,7 +1128,7 @@ destructor_callback(void *ctx)
         // This function may be called without the GIL held, so we need to
         // ensure that we destroy 'ctx' with the GIL held.
         PyGILState_STATE gstate = PyGILState_Ensure();
-        decref_callback_context((callback_context *)ctx);
+        free_callback_context((callback_context *)ctx);
         PyGILState_Release(gstate);
     }
 }
@@ -1251,7 +1173,7 @@ pysqlite_connection_create_function_impl(pysqlite_Connection *self,
                                     func_callback,
                                     NULL,
                                     NULL,
-                                    &destructor_callback);  // will free 'ctx'
+                                    &destructor_callback);  // will decref func
 
     if (rc != SQLITE_OK) {
         /* Workaround for SQLite bug: no error code or string is available here */
@@ -1275,7 +1197,7 @@ inverse_callback(sqlite3_context *context, int argc, sqlite3_value **params)
     PyGILState_STATE gilstate = PyGILState_Ensure();
 
     callback_context *ctx = (callback_context *)sqlite3_user_data(context);
-    incref_callback_context(ctx);
+    assert(ctx != NULL);
 
     int size = sizeof(PyObject *);
     PyObject **cls = (PyObject **)sqlite3_aggregate_context(context, size);
@@ -1307,7 +1229,6 @@ inverse_callback(sqlite3_context *context, int argc, sqlite3_value **params)
     Py_DECREF(res);
 
 exit:
-    decref_callback_context(ctx);
     Py_XDECREF(method);
     PyGILState_Release(gilstate);
 }
@@ -1324,7 +1245,7 @@ value_callback(sqlite3_context *context)
     PyGILState_STATE gilstate = PyGILState_Ensure();
 
     callback_context *ctx = (callback_context *)sqlite3_user_data(context);
-    incref_callback_context(ctx);
+    assert(ctx != NULL);
 
     int size = sizeof(PyObject *);
     PyObject **cls = (PyObject **)sqlite3_aggregate_context(context, size);
@@ -1332,8 +1253,6 @@ value_callback(sqlite3_context *context)
     assert(*cls != NULL);
 
     PyObject *res = PyObject_CallMethodNoArgs(*cls, ctx->state->str_value);
-    decref_callback_context(ctx);
-
     if (res == NULL) {
         int attr_err = PyErr_ExceptionMatches(PyExc_AttributeError);
         set_sqlite_error(context, attr_err
@@ -1451,7 +1370,7 @@ pysqlite_connection_create_aggregate_impl(pysqlite_Connection *self,
                                     0,
                                     &step_callback,
                                     &final_callback,
-                                    &destructor_callback); // will free 'ctx'
+                                    &destructor_callback); // will decref func
     if (rc != SQLITE_OK) {
         /* Workaround for SQLite bug: no error code or string is available here */
         PyErr_SetString(self->OperationalError, "Error creating aggregate");
@@ -1461,7 +1380,7 @@ pysqlite_connection_create_aggregate_impl(pysqlite_Connection *self,
 }
 
 static int
-authorizer_callback(void *ctx_vp, int action, const char *arg1,
+authorizer_callback(void *ctx, int action, const char *arg1,
                     const char *arg2 , const char *dbname,
                     const char *access_attempt_source)
 {
@@ -1470,9 +1389,8 @@ authorizer_callback(void *ctx_vp, int action, const char *arg1,
     PyObject *ret;
     int rc = SQLITE_DENY;
 
-    callback_context *ctx = (callback_context *)ctx_vp;
-    incref_callback_context(ctx);
-    PyObject *callable = ctx->callable;
+    assert(ctx != NULL);
+    PyObject *callable = ((callback_context *)ctx)->callable;
     ret = PyObject_CallFunction(callable, "issss", action, arg1, arg2, dbname,
                                 access_attempt_source);
 
@@ -1494,23 +1412,21 @@ authorizer_callback(void *ctx_vp, int action, const char *arg1,
         Py_DECREF(ret);
     }
 
-    decref_callback_context(ctx);
     PyGILState_Release(gilstate);
     return rc;
 }
 
 static int
-progress_callback(void *ctx_vp)
+progress_callback(void *ctx)
 {
     PyGILState_STATE gilstate = PyGILState_Ensure();
 
     int rc;
     PyObject *ret;
 
-    callback_context *ctx = (callback_context *)ctx_vp;
-    incref_callback_context(ctx);
-
-    ret = PyObject_CallNoArgs(ctx->callable);
+    assert(ctx != NULL);
+    PyObject *callable = ((callback_context *)ctx)->callable;
+    ret = PyObject_CallNoArgs(callable);
     if (!ret) {
         /* abort query if error occurred */
         rc = -1;
@@ -1523,7 +1439,6 @@ progress_callback(void *ctx_vp)
         print_or_clear_traceback(ctx);
     }
 
-    decref_callback_context(ctx);
     PyGILState_Release(gilstate);
     return rc;
 }
@@ -1535,7 +1450,7 @@ progress_callback(void *ctx_vp)
  * to ensure future compatibility.
  */
 static int
-trace_callback(unsigned int type, void *ctx_vp, void *stmt, void *sql)
+trace_callback(unsigned int type, void *ctx, void *stmt, void *sql)
 {
     if (type != SQLITE_TRACE_STMT) {
         return 0;
@@ -1543,9 +1458,8 @@ trace_callback(unsigned int type, void *ctx_vp, void *stmt, void *sql)
 
     PyGILState_STATE gilstate = PyGILState_Ensure();
 
-    callback_context *ctx = (callback_context *)ctx_vp;
-    incref_callback_context(ctx);
-    pysqlite_state *state = ctx->state;
+    assert(ctx != NULL);
+    pysqlite_state *state = ((callback_context *)ctx)->state;
     assert(state != NULL);
 
     PyObject *py_statement = NULL;
@@ -1559,7 +1473,7 @@ trace_callback(unsigned int type, void *ctx_vp, void *stmt, void *sql)
 
         PyErr_SetString(state->DataError,
                 "Expanded SQL string exceeds the maximum string length");
-        print_or_clear_traceback(ctx);
+        print_or_clear_traceback((callback_context *)ctx);
 
         // Fall back to unexpanded sql
         py_statement = PyUnicode_FromString((const char *)sql);
@@ -1569,16 +1483,16 @@ trace_callback(unsigned int type, void *ctx_vp, void *stmt, void *sql)
         sqlite3_free((void *)expanded_sql);
     }
     if (py_statement) {
-        PyObject *ret = PyObject_CallOneArg(ctx->callable, py_statement);
+        PyObject *callable = ((callback_context *)ctx)->callable;
+        PyObject *ret = PyObject_CallOneArg(callable, py_statement);
         Py_DECREF(py_statement);
         Py_XDECREF(ret);
     }
     if (PyErr_Occurred()) {
-        print_or_clear_traceback(ctx);
+        print_or_clear_traceback((callback_context *)ctx);
     }
 
 exit:
-    decref_callback_context(ctx);
     PyGILState_Release(gilstate);
     return 0;
 }
@@ -1631,8 +1545,8 @@ _sqlite3.Connection.set_progress_handler as pysqlite_connection_set_progress_han
     cls: defining_class
     progress_handler as callable: object
         A callable that takes no arguments.
-        If the callable returns non-zero, the current query is
-        terminated, and an exception is raised.
+        If the callable returns non-zero, the current query is terminated,
+        and an exception is raised.
     / [from 3.15]
     n: int
         The number of SQLite virtual machine instructions that are
@@ -1640,15 +1554,14 @@ _sqlite3.Connection.set_progress_handler as pysqlite_connection_set_progress_han
 
 Set progress handler callback.
 
-If 'progress_handler' is None or 'n' is 0, the progress handler is
-disabled.
+If 'progress_handler' is None or 'n' is 0, the progress handler is disabled.
 [clinic start generated code]*/
 
 static PyObject *
 pysqlite_connection_set_progress_handler_impl(pysqlite_Connection *self,
                                               PyTypeObject *cls,
                                               PyObject *callable, int n)
-/*[clinic end generated code: output=0739957fd8034a50 input=d46887797f0c0ecf]*/
+/*[clinic end generated code: output=0739957fd8034a50 input=b4d6e2ef8b4d32f9]*/
 {
     if (!pysqlite_check_thread(self) || !pysqlite_check_connection(self)) {
         return NULL;
@@ -1994,8 +1907,6 @@ collation_callback(void *context, int text1_length, const void *text1_data,
     PyObject* retval = NULL;
     long longval;
     int result = 0;
-    callback_context *ctx = (callback_context *)context;
-    incref_callback_context(ctx);
 
     /* This callback may be executed multiple times per sqlite3_step(). Bail if
      * the previous call failed */
@@ -2012,6 +1923,8 @@ collation_callback(void *context, int text1_length, const void *text1_data,
         goto finally;
     }
 
+    callback_context *ctx = (callback_context *)context;
+    assert(ctx != NULL);
     PyObject *args[] = { NULL, string1, string2 };  // Borrowed refs.
     size_t nargsf = 2 | PY_VECTORCALL_ARGUMENTS_OFFSET;
     retval = PyObject_Vectorcall(ctx->callable, args + 1, nargsf, NULL);
@@ -2033,7 +1946,6 @@ collation_callback(void *context, int text1_length, const void *text1_data,
     }
 
 finally:
-    decref_callback_context(ctx);
     Py_XDECREF(string1);
     Py_XDECREF(string2);
     Py_XDECREF(retval);
@@ -2257,7 +2169,7 @@ pysqlite_connection_create_collation_impl(pysqlite_Connection *self,
          * the context before returning.
          */
         if (callable != Py_None) {
-            decref_callback_context(ctx);
+            free_callback_context(ctx);
         }
         _pysqlite_seterror(self->state, self->db);
         return NULL;
@@ -2276,15 +2188,15 @@ _sqlite3.Connection.serialize as serialize
 
 Serialize a database into a byte string.
 
-For an ordinary on-disk database file, the serialization is just
-a copy of the disk file.  For an in-memory database or a "temp"
-database, the serialization is the same sequence of bytes which
-would be written to disk if that database were backed up to disk.
+For an ordinary on-disk database file, the serialization is just a copy of the
+disk file. For an in-memory database or a "temp" database, the serialization is
+the same sequence of bytes which would be written to disk if that database
+were backed up to disk.
 [clinic start generated code]*/
 
 static PyObject *
 serialize_impl(pysqlite_Connection *self, const char *name)
-/*[clinic end generated code: output=97342b0e55239dd3 input=7e48654e8e082fa8]*/
+/*[clinic end generated code: output=97342b0e55239dd3 input=d2eb5194a65abe2b]*/
 {
     if (!pysqlite_check_thread(self) || !pysqlite_check_connection(self)) {
         return NULL;
@@ -2329,19 +2241,18 @@ _sqlite3.Connection.deserialize as deserialize
 
 Load a serialized database.
 
-The deserialize interface causes the database connection to
-disconnect from the target database, and then reopen it as
-an in-memory database based on the given serialized data.
+The deserialize interface causes the database connection to disconnect from the
+target database, and then reopen it as an in-memory database based on the given
+serialized data.
 
-The deserialize interface will fail with SQLITE_BUSY if the database
-is currently in a read transaction or is involved in a backup
-operation.
+The deserialize interface will fail with SQLITE_BUSY if the database is
+currently in a read transaction or is involved in a backup operation.
 [clinic start generated code]*/
 
 static PyObject *
 deserialize_impl(pysqlite_Connection *self, Py_buffer *data,
                  const char *name)
-/*[clinic end generated code: output=e394c798b98bad89 input=5d20e028d98c0686]*/
+/*[clinic end generated code: output=e394c798b98bad89 input=1be4ca1faacf28f2]*/
 {
     if (!pysqlite_check_thread(self) || !pysqlite_check_connection(self)) {
         return NULL;
@@ -2414,14 +2325,13 @@ _sqlite3.Connection.__exit__ as pysqlite_connection_exit
 
 Called when the connection is used as a context manager.
 
-If there was any exception, a rollback takes place; otherwise we
-commit.
+If there was any exception, a rollback takes place; otherwise we commit.
 [clinic start generated code]*/
 
 static PyObject *
 pysqlite_connection_exit_impl(pysqlite_Connection *self, PyObject *exc_type,
                               PyObject *exc_value, PyObject *exc_tb)
-/*[clinic end generated code: output=0705200e9321202a input=8fdb0392ee6f3466]*/
+/*[clinic end generated code: output=0705200e9321202a input=bd66f1532c9c54a7]*/
 {
     int commit = 0;
     PyObject* result;
@@ -2461,20 +2371,20 @@ _sqlite3.Connection.setlimit as setlimit
     category: int
         The limit category to be set.
     limit: int
-        The new limit. If the new limit is a negative number, the limit
-        is unchanged.
+        The new limit. If the new limit is a negative number, the limit is
+        unchanged.
     /
 
 Set connection run-time limits.
 
-Attempts to increase a limit above its hard upper bound are silently
-truncated to the hard upper bound. Regardless of whether or not the
-limit was changed, the prior value of the limit is returned.
+Attempts to increase a limit above its hard upper bound are silently truncated
+to the hard upper bound. Regardless of whether or not the limit was changed,
+the prior value of the limit is returned.
 [clinic start generated code]*/
 
 static PyObject *
 setlimit_impl(pysqlite_Connection *self, int category, int limit)
-/*[clinic end generated code: output=0d208213f8d68ccd input=5c2e430091206677]*/
+/*[clinic end generated code: output=0d208213f8d68ccd input=9bd469537e195635]*/
 {
     if (!pysqlite_check_thread(self) || !pysqlite_check_connection(self)) {
         return NULL;
@@ -2672,10 +2582,6 @@ static PyGetSetDef connection_getset[] = {
     {"in_transaction",  (getter)pysqlite_connection_get_in_transaction, (setter)0},
     {"autocommit",  (getter)get_autocommit, (setter)set_autocommit},
     {"__text_signature__", get_sig, (setter)0},
-    {"row_factory", connection_get_row_factory,
-                    connection_set_row_factory},
-    {"text_factory", connection_get_text_factory,
-                     connection_set_text_factory},
     {NULL}
 };
 
@@ -2723,6 +2629,8 @@ static struct PyMemberDef connection_members[] =
     {"InternalError", _Py_T_OBJECT, offsetof(pysqlite_Connection, InternalError), Py_READONLY},
     {"ProgrammingError", _Py_T_OBJECT, offsetof(pysqlite_Connection, ProgrammingError), Py_READONLY},
     {"NotSupportedError", _Py_T_OBJECT, offsetof(pysqlite_Connection, NotSupportedError), Py_READONLY},
+    {"row_factory", _Py_T_OBJECT, offsetof(pysqlite_Connection, row_factory)},
+    {"text_factory", _Py_T_OBJECT, offsetof(pysqlite_Connection, text_factory)},
     {NULL}
 };
 

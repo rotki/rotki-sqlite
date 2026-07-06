@@ -35,7 +35,7 @@ typedef struct
     pysqlite_Connection* connection;
     PyObject* description;
     PyObject* row_cast_map;
-    uint32_t arraysize;
+    int arraysize;
     PyObject* lastrowid;
     long rowcount;
     PyObject* row_factory;

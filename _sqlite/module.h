@@ -28,7 +28,9 @@
 #define LEGACY_TRANSACTION_CONTROL -1
 
 #define PYSQLITE_VERSION "2.6.0"
-#define MODULE_NAME "rsqlite"
+#ifndef MODULE_NAME
+#  define MODULE_NAME "sqlite3"
+#endif
 
 typedef struct {
     PyObject *DataError;
