@@ -15,10 +15,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PYTHON_VERSION: '3.13.5'
-  CIBW_VERSION: '2.21.3'
+  PYTHON_VERSION: '3.13.14'
+  CIBW_VERSION: '3.4.1'
   CIBW_BUILD: 'cp313-* cp313t-*'
-  CIBW_FREE_THREADED_SUPPORT: '1'
+  CIBW_ENABLE: 'cpython-freethreading'
   CIBW_SKIP: '*-musllinux_*'
   CIBW_BUILD_VERBOSITY: 1
   CIBW_BUILD_FRONTEND: 'build[uv]'
