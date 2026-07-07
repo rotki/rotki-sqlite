@@ -23,10 +23,14 @@
 
 #ifndef PYSQLITE_MODULE_H
 #define PYSQLITE_MODULE_H
-#define PY_SSIZE_T_CLEAN
 #include "Python.h"
 
+#define LEGACY_TRANSACTION_CONTROL -1
+
 #define PYSQLITE_VERSION "2.6.0"
+#ifndef MODULE_NAME
+#  define MODULE_NAME "sqlite3"
+#endif
 
 typedef struct {
     PyObject *DataError;
