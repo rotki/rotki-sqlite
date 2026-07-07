@@ -168,12 +168,6 @@ jobs:
 
       - name: Build wheels
         run: |
-          $env:CIBW_BUILD = "cp313-*"
-          $env:LINK = "python313.lib"
-          python -m cibuildwheel --output-dir dist
-
-          $env:CIBW_BUILD = "cp313t-*"
-          $env:LINK = "python313t.lib"
           python -m cibuildwheel --output-dir dist
 
       - name: Upload Windows wheel
