@@ -1,9 +1,9 @@
 # rsqlite3
 
-A Python 3.13 SQLite3 extension module with static SQLite build support.
+A Python 3.14 SQLite3 extension module with static SQLite build support.
 
-The release workflow builds wheels for both standard (`cp313`) and
-free-threaded (`cp313t`) Python 3.13 interpreters.
+The release workflow builds wheels for both standard (`cp314`) and
+free-threaded (`cp314t`) Python 3.14 interpreters.
 
 ## Building
 

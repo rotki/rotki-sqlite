@@ -15,13 +15,13 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PYTHON_VERSION: '3.13.14'
+  PYTHON_VERSION: '3.14.6'
   CIBW_VERSION: '3.4.1'
-  CIBW_BUILD: 'cp313-* cp313t-*'
-  CIBW_ENABLE: 'cpython-freethreading'
+  CIBW_BUILD: 'cp314-* cp314t-*'
   CIBW_SKIP: '*-musllinux_*'
   CIBW_BUILD_VERBOSITY: 1
   CIBW_BUILD_FRONTEND: 'build[uv]'
+  CIBW_TEST_COMMAND: 'python {project}/tests/test_rsqlite.py'
   SQLITE_VERSION: '3.46.1'
 
 jobs:
@@ -94,7 +94,7 @@ jobs:
       - name: Upload macOS wheels
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: wheel-macos-${{ matrix.os.arch }}-cp313-cp313t
+          name: wheel-macos-${{ matrix.os.arch }}-cp314-cp314t
           path: dist/*.whl
 
   build_wheels_linux:
@@ -138,7 +138,7 @@ jobs:
       - name: Upload Linux wheel
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: wheel-linux-${{ matrix.arch.name }}-cp313-cp313t
+          name: wheel-linux-${{ matrix.arch.name }}-cp314-cp314t
           path: dist/*.whl
 
   build_wheels_windows:
@@ -173,7 +173,7 @@ jobs:
       - name: Upload Windows wheel
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
-          name: wheel-windows-cp313-cp313t
+          name: wheel-windows-cp314-cp314t
           path: dist/*.whl
 
   build_sdist:
